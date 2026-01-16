@@ -27,6 +27,7 @@ export class StreamParser {
       sessionChanges: 0,
       estimatedCost: 0,
       lastCommitTime: null,
+      subagents: [],
     };
   }
 
@@ -110,6 +111,18 @@ export class StreamParser {
           name: tool.name,
           startTime: new Date(),
         });
+        
+        // Track subagent launches (Task tool)
+        if (tool.name === 'Task' && tool.input) {
+          const input = tool.input as any;
+          this.stats.subagents.push({
+            description: input.description || 'Unknown task',
+            subagentType: input.subagent_type || 'general-purpose',
+            model: input.model || 'opus',
+            timestamp: new Date(),
+            prompt: input.prompt,
+          });
+        }
       }
     }
 

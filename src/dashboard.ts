@@ -9,6 +9,7 @@ export class Dashboard {
   private tokensBox: blessed.Widgets.BoxElement;
   private toolsTable: contrib.Widgets.TableElement;
   private activityLog: contrib.Widgets.LogElement;
+  private subagentLog: contrib.Widgets.LogElement;
   private errorsLog: contrib.Widgets.LogElement;
   private toolCountChart: contrib.Widgets.BarElement;
   private toolCounts: Map<string, number> = new Map();
@@ -62,7 +63,7 @@ export class Dashboard {
     });
 
     // Recent tools table (middle left)
-    this.toolsTable = this.grid.set(3, 0, 4, 6, contrib.table, {
+    this.toolsTable = this.grid.set(3, 0, 5, 6, contrib.table, {
       label: ' 🛠️  Recent Tool Calls ',
       keys: true,
       interactive: false,
@@ -75,9 +76,9 @@ export class Dashboard {
       },
     });
 
-    // Activity log (middle right)
-    this.activityLog = this.grid.set(3, 6, 4, 6, contrib.log, {
-      label: ' 📜 Activity Log ',
+    // Main agent activity log (middle right - expanded)
+    this.activityLog = this.grid.set(3, 6, 5, 6, contrib.log, {
+      label: ' 🤵 Main Agent Activity ',
       tags: true,
       border: { type: 'line' },
       style: {
@@ -91,8 +92,8 @@ export class Dashboard {
       },
     });
 
-    // Errors log (bottom)
-    this.errorsLog = this.grid.set(7, 0, 5, 12, contrib.log, {
+    // Errors log (bottom left - same size as tool calls)
+    this.errorsLog = this.grid.set(8, 0, 5, 6, contrib.log, {
       label: ' ⚠️  Errors & Warnings ',
       tags: true,
       border: { type: 'line' },
@@ -107,6 +108,22 @@ export class Dashboard {
       },
     });
 
+    // Subagent activity log (bottom right - same size as main activity)
+    this.subagentLog = this.grid.set(8, 6, 5, 6, contrib.log, {
+      label: ' 🤖 Subagent Activity ',
+      tags: true,
+      border: { type: 'line' },
+      style: {
+        border: { fg: 'blue' },
+        fg: 'cyan',
+      },
+      scrollback: 200,
+      scrollbar: {
+        ch: ' ',
+        style: { bg: 'cyan' },
+      },
+    });
+
     // Key bindings
     this.screen.key(['escape', 'q', 'C-c'], () => {
       process.exit(0);
@@ -114,6 +131,7 @@ export class Dashboard {
 
     this.screen.key(['c'], () => {
       this.activityLog.setContent('');
+      this.subagentLog.setContent('');
       this.errorsLog.setContent('');
       this.screen.render();
     });
@@ -163,6 +181,7 @@ export class Dashboard {
       `{bold}Runtime:{/bold}   ${elapsed}\n` +
       `{bold}Model:{/bold}     {cyan-fg}${stats.currentModel.split('-').slice(0, 2).join('-')}{/cyan-fg}\n` +
       `{bold}Tools:{/bold}     {green-fg}${successCount}{/green-fg} ✓ / {red-fg}${errorCount}{/red-fg} ✗ (${successRate}%)\n` +
+      `{bold}Subagents:{/bold} {blue-fg}${stats.subagents.length}{/blue-fg}\n` +
       `{bold}Last Commit:{/bold} {magenta-fg}${lastCommit}{/magenta-fg}`
     );
 
@@ -207,7 +226,13 @@ export class Dashboard {
   }
 
   logEvent(event: ParsedEvent): void {
-    const time = event.timestamp.toLocaleTimeString();
+    const time = event.timestamp.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit',
+      fractionalSecondDigits: 3
+    });
     
     switch (event.type) {
       case 'tool_call': {
@@ -215,27 +240,103 @@ export class Dashboard {
         const name = data.name;
         this.toolCounts.set(name, (this.toolCounts.get(name) || 0) + 1);
         
-        let detail = '';
-        if (data.input) {
-          if ('command' in data.input) {
-            detail = `: ${String(data.input.command).slice(0, 40)}...`;
-          } else if ('description' in data.input) {
-            detail = `: ${String(data.input.description).slice(0, 40)}`;
+        // Handle subagent launches - log to subagent panel with full details
+        if (name === 'Task' && data.input) {
+          const input = data.input as any;
+          const model = input.model || 'opus';
+          const type = input.subagent_type || 'general';
+          const desc = input.description || 'Unknown task';
+          const prompt = input.prompt || '';
+          
+          this.subagentLog.log(`{cyan-fg}[${time}]{/cyan-fg} {bold}{yellow-fg}🚀 LAUNCH{/yellow-fg}{/bold} [{model}/${type}]`);
+          this.subagentLog.log(`   {bold}Task:{/bold} ${desc}`);
+          if (prompt) {
+            const lines = prompt.split('\n').slice(0, 3);
+            lines.forEach((line: string) => {
+              if (line.trim()) {
+                const cleanLine = line.slice(0, 80).replace(/[{}]/g, '');
+                this.subagentLog.log(`   ${cleanLine}${line.length > 80 ? '...' : ''}`);
+              }
+            });
+            if (prompt.split('\n').length > 3) {
+              this.subagentLog.log(`   ... [${prompt.split('\n').length - 3} more lines]`);
+            }
           }
+          this.subagentLog.log('');
+        } else {
+          // Main agent tools - log to main activity
+          let detail = '';
+          if (data.input) {
+            if ('command' in data.input) {
+              detail = `: ${String(data.input.command).slice(0, 40)}...`;
+            } else if ('description' in data.input) {
+              detail = `: ${String(data.input.description).slice(0, 40)}`;
+            }
+          }
+          this.activityLog.log(`{cyan-fg}[${time}]{/cyan-fg} 🔧 {bold}${name}{/bold}${detail}`);
         }
-        this.activityLog.log(`{cyan-fg}[${time}]{/cyan-fg} 🔧 {bold}${name}{/bold}${detail}`);
         break;
       }
       
       case 'tool_result': {
-        const data = event.data as { toolName?: string; success: boolean; duration?: number };
-        const status = data.success ? '{green-fg}✓{/green-fg}' : '{red-fg}✗{/red-fg}';
+        const data = event.data as { toolName?: string; success: boolean; duration?: number; content?: string; stdout?: string; stderr?: string };
+        const status = data.success ? '{green-fg}OK{/green-fg}' : '{red-fg}FAIL{/red-fg}';
         const duration = data.duration ? ` (${this.formatDuration(data.duration)})` : '';
-        this.activityLog.log(`{gray-fg}[${time}]{/gray-fg}    ${status} ${data.toolName || 'unknown'}${duration}`);
+        const toolName = (data.toolName || 'unknown').replace(/[{}]/g, '');
         
         if (!data.success) {
-          const resultData = event.data as { content?: string };
-          this.errorsLog.log(`{red-fg}[${time}]{/red-fg} Tool failed: ${data.toolName}\n  ${resultData.content?.slice(0, 200) || 'Unknown error'}`);
+          // Get error text from available sources
+          const errorText = data.stderr?.trim() || data.content?.trim() || 'Unknown error';
+          const errorPreview = errorText.split('\n')[0].slice(0, 80).replace(/[{}]/g, '');
+          
+          // Show error in activity log
+          this.activityLog.log(`{gray-fg}[${time}]{/gray-fg} ${status} {red-fg}${toolName}${duration}{/red-fg}`);
+          this.activityLog.log(`{gray-fg}       -> {/gray-fg}{red-fg}${errorPreview}{/red-fg}`);
+          
+          // Show full error details in errors panel
+          const errorLines = [];
+          errorLines.push(`{red-fg}{bold}[${time}] ${toolName} Failed${duration}{/bold}{/red-fg}`);
+          errorLines.push('');
+          
+          // Show stderr if present
+          if (data.stderr && data.stderr.trim()) {
+            errorLines.push('{yellow-fg}STDERR:{/yellow-fg}');
+            const stderrLines = data.stderr.trim().split('\n').slice(0, 10);
+            stderrLines.forEach(line => {
+              const cleaned = line.slice(0, 120).replace(/[{}]/g, '');
+              errorLines.push(`  ${cleaned}`);
+            });
+            errorLines.push('');
+          }
+          
+          // Show content/output (main error info)
+          if (data.content && data.content.trim()) {
+            errorLines.push('{red-fg}ERROR:{/red-fg}');
+            const contentLines = data.content.trim().split('\n').slice(0, 15);
+            contentLines.forEach(line => {
+              const cleaned = line.slice(0, 120).replace(/[{}]/g, '');
+              errorLines.push(`  ${cleaned}`);
+            });
+            errorLines.push('');
+          }
+          
+          // Show stdout if present  
+          if (data.stdout && data.stdout.trim()) {
+            errorLines.push('{cyan-fg}STDOUT:{/cyan-fg}');
+            const stdoutLines = data.stdout.trim().split('\n').slice(0, 10);
+            stdoutLines.forEach(line => {
+              const cleaned = line.slice(0, 120).replace(/[{}]/g, '');
+              errorLines.push(`  ${cleaned}`);
+            });
+            errorLines.push('');
+          }
+          
+          errorLines.push('{gray-fg}------------------------------------------------------------{/gray-fg}');
+          
+          // Log each line separately for blessed
+          errorLines.forEach(line => this.errorsLog.log(line));
+        } else {
+          this.activityLog.log(`{gray-fg}[${time}]{/gray-fg}    ${status} ${toolName}${duration}`);
         }
         break;
       }

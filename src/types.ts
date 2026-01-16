@@ -62,6 +62,14 @@ export interface ModelSwitch {
   timestamp: Date;
 }
 
+export interface SubagentLaunch {
+  description: string;
+  subagentType: string;
+  model: string;
+  timestamp: Date;
+  prompt?: string;
+}
+
 export interface LoopStats {
   iteration: number;
   startTime: Date;
@@ -84,6 +92,7 @@ export interface LoopStats {
   sessionChanges: number;
   estimatedCost: number;
   lastCommitTime: Date | null;
+  subagents: SubagentLaunch[];
 }
 
 export interface ParsedEvent {

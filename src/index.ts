@@ -23,6 +23,9 @@ Keys:
   c               Clear logs
 `;
 
+const MAX_FILE_SIZE_MB = 100;
+const WARN_FILE_SIZE_MB = 50;
+
 async function main() {
   const args = process.argv.slice(2);
   
@@ -77,8 +80,22 @@ async function main() {
     
     // Read existing content
     let position = 0;
+    let lastSizeWarning = 0;
+    
     const readFromPosition = () => {
       const stat = statSync(filePath);
+      const sizeMB = stat.size / (1024 * 1024);
+      
+      // Warn about file size
+      if (sizeMB > WARN_FILE_SIZE_MB && (sizeMB - lastSizeWarning) > 10) {
+        dashboard.logMessage(`Log file is ${sizeMB.toFixed(1)}MB - consider rotating`, 'warn');
+        lastSizeWarning = sizeMB;
+      }
+      
+      if (sizeMB > MAX_FILE_SIZE_MB) {
+        dashboard.logMessage(`Log file exceeds ${MAX_FILE_SIZE_MB}MB - performance may degrade`, 'error');
+      }
+      
       if (stat.size > position) {
         const stream = createReadStream(filePath, { start: position });
         const rl = createInterface({ input: stream });
