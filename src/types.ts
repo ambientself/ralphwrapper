@@ -50,6 +50,18 @@ export interface UserMessage {
 
 export type StreamMessage = AssistantMessage | UserMessage;
 
+export interface FileOperation {
+  path: string;
+  operation: 'create' | 'edit' | 'read' | 'delete';
+  timestamp: Date;
+}
+
+export interface ModelSwitch {
+  from: string;
+  to: string;
+  timestamp: Date;
+}
+
 export interface LoopStats {
   iteration: number;
   startTime: Date;
@@ -67,6 +79,11 @@ export interface LoopStats {
   currentModel: string;
   sessionId: string;
   lastActivity: Date;
+  fileOperations: FileOperation[];
+  modelSwitches: ModelSwitch[];
+  sessionChanges: number;
+  estimatedCost: number;
+  lastCommitTime: Date | null;
 }
 
 export interface ParsedEvent {

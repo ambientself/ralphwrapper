@@ -1,3 +1,7 @@
+This is just a simple project I had AI make for Ralph.
+I want to know where Ralph was at.
+
+
 # Ralph Loop Monitor 🔄
 
 A terminal UI dashboard for monitoring `ralph.sh` loop execution in real-time.

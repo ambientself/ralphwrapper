@@ -154,11 +154,16 @@ export class Dashboard {
       ? ((successCount / stats.toolCalls.length) * 100).toFixed(1)
       : '100';
 
+    const lastCommit = stats.lastCommitTime 
+      ? this.getElapsedTime(stats.lastCommitTime) + ' ago'
+      : 'none';
+
     this.statsBox.setContent(
       `{bold}Iteration:{/bold} {green-fg}${stats.iteration}{/green-fg}\n` +
       `{bold}Runtime:{/bold}   ${elapsed}\n` +
       `{bold}Model:{/bold}     {cyan-fg}${stats.currentModel.split('-').slice(0, 2).join('-')}{/cyan-fg}\n` +
-      `{bold}Tools:{/bold}     {green-fg}${successCount}{/green-fg} ✓ / {red-fg}${errorCount}{/red-fg} ✗ (${successRate}%)`
+      `{bold}Tools:{/bold}     {green-fg}${successCount}{/green-fg} ✓ / {red-fg}${errorCount}{/red-fg} ✗ (${successRate}%)\n` +
+      `{bold}Last Commit:{/bold} {magenta-fg}${lastCommit}{/magenta-fg}`
     );
 
     const totalTokens = stats.totalInputTokens + stats.totalOutputTokens;

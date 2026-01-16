@@ -166,6 +166,14 @@ export class StreamParser {
           this.stats.errors.push(result.content.slice(0, 200));
         }
 
+        // Track git commits/pushes
+        if (!result.is_error && result.content) {
+          const content = result.content.toLowerCase();
+          if (content.includes('git push') || content.includes('git commit')) {
+            this.stats.lastCommitTime = new Date();
+          }
+        }
+
         this.pendingToolCalls.delete(result.tool_use_id);
 
         return {
