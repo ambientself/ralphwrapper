@@ -248,7 +248,7 @@ export class Dashboard {
           const desc = input.description || 'Unknown task';
           const prompt = input.prompt || '';
           
-          this.subagentLog.log(`{cyan-fg}[${time}]{/cyan-fg} {bold}{yellow-fg}🚀 LAUNCH{/yellow-fg}{/bold} [{model}/${type}]`);
+          this.subagentLog.log(`{cyan-fg}[${time}]{/cyan-fg} {bold}{yellow-fg}🚀 LAUNCH{/yellow-fg}{/bold} [${model}/${type}]`);
           this.subagentLog.log(`   {bold}Task:{/bold} ${desc}`);
           if (prompt) {
             const lines = prompt.split('\n').slice(0, 3);
