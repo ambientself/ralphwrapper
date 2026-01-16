@@ -22,6 +22,11 @@ export class StreamParser {
       currentModel: 'unknown',
       sessionId: '',
       lastActivity: new Date(),
+      fileOperations: [],
+      modelSwitches: [],
+      sessionChanges: 0,
+      estimatedCost: 0,
+      lastCommitTime: null,
     };
   }
 
